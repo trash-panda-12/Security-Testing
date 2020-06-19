@@ -4,7 +4,10 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require('mongoose');
-const md5 = require("md5");
+// const md5 = require("md5");
+const bcrypt = require("bcrypt");
+//We will set the saltRounds low since high salt Rounds will make our pc work harder to make a more secure hashed password. We are just testing and have no risk if we get hacked on this so we don't need to kill our pc by doing a high number. Decent number of rounds would be 10ish
+const saltRounds = 3;
 
 
 
@@ -55,18 +58,24 @@ app.get("/register", function (req, res) {
 });
 
 app.post("/register", function(req,res){
-    const newUser = new User({
-      email: req.body.username,
-      password: md5(req.body.password),
-    });
+    
+    //Hash the password and in the callback of the hashing funciton, declare the new document 'User' and save it to the database
+    bcrypt.hash(req.body.password, saltRounds, function(err,hashedPassword){
 
-    newUser.save(function(err){
-        if(err) {
-            console.log(err)
-        }else {
-            res.render('secrets');
-        }
+        const newUser = new User({
+            email: req.body.username,
+            password: hashedPassword
+        });
+
+        newUser.save(function (err) {
+          if (err) {
+            console.log(err);
+          } else {
+            res.render("secrets");
+          }
+        });
     });
+    
 });
 
 app.post("/login", function(req,res){
@@ -80,9 +89,14 @@ app.post("/login", function(req,res){
         }else {
             //Checks if password given matches password on the database
             if(foundUser) {
-                if(foundUser.password === password){
-                    res.render("secrets")
-                };
+                bcrypt.compare(password, foundUser.password, function(err, result){
+                    if(err){
+                        console.log(err);
+                        res.render(err);
+                    }else if (result === true){
+                        res.render("secrets")
+                    }
+                })
             };
         };
     });
